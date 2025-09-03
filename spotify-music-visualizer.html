@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotify Music Visualizer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #000;
+            color: #fff;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        #login-screen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 40px;
+            border-radius: 20px;
+            border: 2px solid #1db954;
+            backdrop-filter: blur(10px);
+        }
+
+        #login-screen h1 {
+            margin-bottom: 20px;
+            font-size: 2.5em;
+            background: linear-gradient(45deg, #1db954, #1ed760);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        #login-btn {
+            background: #1db954;
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 18px;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 20px;
+        }
+
+        #login-btn:hover {
+            background: #1ed760;
+            transform: scale(1.05);
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            display: none;
+            width: 90%;
+            max-width: 800px;
+        }
+
+        #player-controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+
+        .control-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.1);
+        }
+
+        #play-pause {
+            width: 60px;
+            height: 60px;
+            font-size: 24px;
+        }
+
+        #track-info {
+            text-align: center;
+            margin-bottom: 15px;
+            min-height: 50px;
+        }
+
+        #track-name {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        #track-artist {
+            font-size: 14px;
+            opacity: 0.7;
+        }
+
+        #progress-container {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            margin: 15px 0;
+            cursor: pointer;
+            position: relative;
+        }
+
+        #progress-bar {
+            height: 100%;
+            background: #1db954;
+            border-radius: 2px;
+            width: 0%;
+            transition: width 0.1s;
+        }
+
+        #volume-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        #volume-slider {
+            flex: 1;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            cursor: pointer;
+            position: relative;
+        }
+
+        #volume-bar {
+            height: 100%;
+            background: #1db954;
+            border-radius: 2px;
+            width: 50%;
+        }
+
+        #options {
+            display: flex;
+            gap: 15px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        select {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 8px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        select option {
+            background: #000;
+        }
+
+        #settings-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 101;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            display: none;
+        }
+
+        #settings-toggle:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        #client-id-input {
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 8px;
+            border: 1px solid #1db954;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            margin: 10px 0;
+            width: 300px;
+        }
+
+        #client-id-input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    
+    <div id="login-screen">
+        <h1>🎵 Music Visualizer</h1>
+        <p>Enter your Spotify Client ID:</p>
+        <input type="text" id="client-id-input" placeholder="Your Client ID">
+        <br>
+        <button id="login-btn">Connect to Spotify</button>
+        <p style="margin-top: 20px; font-size: 12px; opacity: 0.7;">
+            Make sure you're logged into Spotify in your browser first
+        </p>
+    </div>
+
+    <button id="settings-toggle">Toggle Controls</button>
+
+    <div id="controls">
+        <div id="track-info">
+            <div id="track-name">No track playing</div>
+            <div id="track-artist"></div>
+        </div>
+
+        <div id="progress-container">
+            <div id="progress-bar"></div>
+        </div>
+
+        <div id="player-controls">
+            <button class="control-btn" id="prev-track">⏮</button>
+            <button class="control-btn" id="play-pause">▶</button>
+            <button class="control-btn" id="next-track">⏭</button>
+        </div>
+
+        <div id="volume-container">
+            <span>🔊</span>
+            <div id="volume-slider">
+                <div id="volume-bar"></div>
+            </div>
+        </div>
+
+        <div id="options">
+            <select id="visualization-mode">
+                <option value="particles">Particles</option>
+                <option value="bars">Frequency Bars</option>
+                <option value="circular">Circular Wave</option>
+                <option value="spiral">Spiral</option>
+                <option value="dna">DNA Helix</option>
+                <option value="kaleidoscope">Kaleidoscope</option>
+            </select>
+
+            <select id="color-theme">
+                <option value="spectrum">Spectrum</option>
+                <option value="neon">Neon</option>
+                <option value="sunset">Sunset</option>
+                <option value="ocean">Ocean</option>
+                <option value="fire">Fire</option>
+                <option value="monochrome">Monochrome</option>
+                <option value="pastel">Pastel</option>
+            </select>
+
+            <select id="sensitivity">
+                <option value="0.5">Low Sensitivity</option>
+                <option value="1" selected>Normal</option>
+                <option value="1.5">High Sensitivity</option>
+                <option value="2">Ultra Sensitive</option>
+            </select>
+        </div>
+    </div>
+
+    <script src="https://sdk.scdn.co/spotify-player.js"></script>
+    <script>
+        // Configuration
+        let CLIENT_ID = '';
+        // IMPORTANT: Replace 'your-github-username' with your actual GitHub username
+        const REDIRECT_URI = window.location.origin + window.location.pathname;
+        const SCOPES = [
+            'streaming',
+            'user-read-email',
+            'user-read-private',
+            'user-modify-playback-state',
+            'user-read-playback-state'
+        ];
+
+        // Global variables
+        let player;
+        let deviceId;
+        let audioContext;
+        let analyser;
+        let source;
+        let dataArray;
+        let isPlaying = false;
+        let animationId;
+        let currentVisualization = 'particles';
+        let currentTheme = 'spectrum';
+        let sensitivity = 1;
+
+        // Particle system
+        let particles = [];
+        const maxParticles = 100;
+
+        // Canvas setup
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Color themes
+        const themes = {
+            spectrum: () => {
+                const time = Date.now() * 0.001;
+                return `hsl(${(time * 50) % 360}, 100%, 50%)`;
+            },
+            neon: (intensity) => {
+                const colors = ['#ff00ff', '#00ffff', '#ff00aa', '#00ff00'];
+                return colors[Math.floor(Math.random() * colors.length)];
+            },
+            sunset: (intensity) => {
+                const h = 10 + intensity * 40;
+                return `hsl(${h}, 100%, ${50 + intensity * 20}%)`;
+            },
+            ocean: (intensity) => {
+                const h = 180 + intensity * 40;
+                return `hsl(${h}, 100%, ${40 + intensity * 30}%)`;
+            },
+            fire: (intensity) => {
+                const h = intensity * 60;
+                return `hsl(${h}, 100%, ${50 + intensity * 20}%)`;
+            },
+            monochrome: (intensity) => {
+                const brightness = Math.floor(intensity * 255);
+                return `rgb(${brightness}, ${brightness}, ${brightness})`;
+            },
+            pastel: (intensity) => {
+                const h = (Date.now() * 0.05 + intensity * 100) % 360;
+                return `hsl(${h}, 70%, 70%)`;
+            }
+        };
+
+        // Resize canvas
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Particle class
+        class Particle {
+            constructor(x, y, intensity) {
+                this.x = x;
+                this.y = y;
+                this.size = Math.random() * 5 + intensity * 10;
+                this.speedX = (Math.random() - 0.5) * intensity * 10;
+                this.speedY = (Math.random() - 0.5) * intensity * 10;
+                this.life = 1;
+                this.decay = Math.random() * 0.02 + 0.005;
+                this.intensity = intensity;
+            }
+
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                this.life -= this.decay;
+                this.size *= 0.98;
+            }
+
+            draw(ctx, color) {
+                ctx.save();
+                ctx.globalAlpha = this.life;
+                ctx.fillStyle = color;
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // OAuth functions
+        function generateRandomString(length) {
+            const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let text = '';
+            for (let i = 0; i < length; i++) {
+                text += possible.charAt(Math.floor(Math.random() * possible.length));
+            }
+            return text;
+        }
+
+        async function generateCodeChallenge(codeVerifier) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(codeVerifier);
+            const digest = await window.crypto.subtle.digest('SHA-256', data);
+            return btoa(String.fromCharCode.apply(null, [...new Uint8Array(digest)]))
+                .replace(/\+/g, '-')
+                .replace(/\//g, '_')
+                .replace(/=+$/, '');
+        }
+
+        document.getElementById('login-btn').addEventListener('click', async () => {
+            CLIENT_ID = document.getElementById('client-id-input').value.trim();
+            
+            if (!CLIENT_ID) {
+                alert('Please enter your Spotify Client ID');
+                return;
+            }
+
+            const codeVerifier = generateRandomString(128);
+            const codeChallenge = await generateCodeChallenge(codeVerifier);
+            const state = generateRandomString(16);
+
+            localStorage.setItem('code_verifier', codeVerifier);
+            localStorage.setItem('client_id', CLIENT_ID);
+
+            const args = new URLSearchParams({
+                response_type: 'code',
+                client_id: CLIENT_ID,
+                scope: SCOPES.join(' '),
+                redirect_uri: REDIRECT_URI,
+                state: state,
+                code_challenge_method: 'S256',
+                code_challenge: codeChallenge
+            });
+
+            window.location = 'https://accounts.spotify.com/authorize?' + args;
+        });
+
+        // Check for callback
+        async function handleCallback() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            
+            if (code) {
+                const codeVerifier = localStorage.getItem('code_verifier');
+                CLIENT_ID = localStorage.getItem('client_id');
+                
+                const response = await fetch('https://accounts.spotify.com/api/token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: new URLSearchParams({
+                        client_id: CLIENT_ID,
+                        grant_type: 'authorization_code',
+                        code,
+                        redirect_uri: REDIRECT_URI,
+                        code_verifier: codeVerifier
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.access_token) {
+                    localStorage.setItem('access_token', data.access_token);
+                    window.history.replaceState({}, document.title, '/');
+                    initializePlayer(data.access_token);
+                }
+            } else if (localStorage.getItem('access_token')) {
+                CLIENT_ID = localStorage.getItem('client_id');
+                initializePlayer(localStorage.getItem('access_token'));
+            }
+        }
+
+        // Initialize Spotify Player
+        function initializePlayer(token) {
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('controls').style.display = 'block';
+            document.getElementById('settings-toggle').style.display = 'block';
+
+            window.onSpotifyWebPlaybackSDKReady = () => {
+                player = new Spotify.Player({
+                    name: 'Music Visualizer',
+                    getOAuthToken: cb => { cb(token); },
+                    volume: 0.5
+                });
+
+                // Ready
+                player.addListener('ready', ({ device_id }) => {
+                    console.log('Ready with Device ID', device_id);
+                    deviceId = device_id;
+                    transferPlayback(device_id, token);
+                });
+
+                // Not Ready
+                player.addListener('not_ready', ({ device_id }) => {
+                    console.log('Device ID has gone offline', device_id);
+                });
+
+                // Player state changed
+                player.addListener('player_state_changed', state => {
+                    if (!state) return;
+
+                    const track = state.track_window.current_track;
+                    document.getElementById('track-name').textContent = track.name;
+                    document.getElementById('track-artist').textContent = track.artists.map(a => a.name).join(', ');
+
+                    isPlaying = !state.paused;
+                    document.getElementById('play-pause').textContent = isPlaying ? '⏸' : '▶';
+
+                    // Update progress
+                    const progress = (state.position / state.duration) * 100;
+                    document.getElementById('progress-bar').style.width = progress + '%';
+                });
+
+                player.connect();
+            };
+
+            // Initialize audio context for visualization
+            initAudioContext();
+        }
+
+        // Transfer playback to this device
+        async function transferPlayback(device_id, token) {
+            await fetch('https://api.spotify.com/v1/me/player', {
+                method: 'PUT',
+                body: JSON.stringify({
+                    device_ids: [device_id],
+                    play: false,
+                }),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+            });
+        }
+
+        // Initialize audio context for visualization
+        function initAudioContext() {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 256;
+            analyser.smoothingTimeConstant = 0.8;
+            
+            const bufferLength = analyser.frequencyBinCount;
+            dataArray = new Uint8Array(bufferLength);
+
+            // Try to capture audio from the page
+            if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
+                navigator.mediaDevices.getDisplayMedia({
+                    audio: true,
+                    video: false
+                }).then(stream => {
+                    source = audioContext.createMediaStreamSource(stream);
+                    source.connect(analyser);
+                    animate();
+                }).catch(() => {
+                    // Fallback to animation without real audio data
+                    console.log('Using simulated audio data');
+                    animate();
+                });
+            } else {
+                // Fallback to animation without real audio data
+                animate();
+            }
+        }
+
+        // Visualization functions
+        function drawParticles() {
+            // Get frequency data
+            if (analyser) {
+                analyser.getByteFrequencyData(dataArray);
+            } else {
+                // Simulate data if no audio
+                for (let i = 0; i < 128; i++) {
+                    dataArray[i] = Math.random() * 128 + (isPlaying ? 128 : 0);
+                }
+            }
+
+            // Calculate average frequency
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+                sum += dataArray[i];
+            }
+            const average = sum / dataArray.length;
+            const intensity = (average / 255) * sensitivity;
+
+            // Create new particles
+            if (particles.length < maxParticles && intensity > 0.1) {
+                for (let i = 0; i < 3; i++) {
+                    particles.push(new Particle(
+                        canvas.width / 2,
+                        canvas.height / 2,
+                        intensity
+                    ));
+                }
+            }
+
+            // Update and draw particles
+            particles = particles.filter(particle => particle.life > 0);
+            particles.forEach(particle => {
+                particle.update();
+                particle.draw(ctx, themes[currentTheme](intensity));
+            });
+        }
+
+        function drawBars() {
+            if (analyser) {
+                analyser.getByteFrequencyData(dataArray);
+            } else {
+                for (let i = 0; i < 128; i++) {
+                    dataArray[i] = Math.random() * 128 + (isPlaying ? 128 : 0);
+                }
+            }
+
+            const barWidth = canvas.width / dataArray.length;
+            let x = 0;
+
+            for (let i = 0; i < dataArray.length; i++) {
+                const barHeight = (dataArray[i] / 255) * canvas.height * 0.7 * sensitivity;
+                const intensity = dataArray[i] / 255;
+                
+                ctx.fillStyle = themes[currentTheme](intensity);
+                ctx.fillRect(x, canvas.height - barHeight, barWidth - 2, barHeight);
+                
+                // Reflection
+                ctx.globalAlpha = 0.3;
+                ctx.fillRect(x, canvas.height - barHeight - 10, barWidth - 2, -barHeight * 0.3);
+                ctx.globalAlpha = 1;
+                
+                x += barWidth;
+            }
+        }
+
+        function drawCircular() {
+            if (analyser) {
+                analyser.getByteFrequencyData(dataArray);
+            } else {
+                for (let i = 0; i < 128; i++) {
+                    dataArray[i] = Math.random() * 128 + (isPlaying ? 128 : 0);
+                }
+            }
+
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = Math.min(canvas.width, canvas.height) * 0.3;
+
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            
+            for (let i = 0; i < dataArray.length; i++) {
+                const angle = (i / dataArray.length) * Math.PI * 2;
+                const intensity = dataArray[i] / 255;
+                const barHeight = intensity * 200 * sensitivity;
+                
+                ctx.save();
+                ctx.rotate(angle);
+                ctx.fillStyle = themes[currentTheme](intensity);
+                ctx.fillRect(radius, -2, barHeight, 4);
+                ctx.restore();
+            }
+            
+            ctx.restore();
+        }
+
+        function drawSpiral() {
+            if (analyser) {
+                analyser.getByteFrequencyData(dataArray);
+            } else {
+                for (let i = 0; i < 128; i++) {
+                    dataArray[i] = Math.random() * 128 + (isPlaying ? 128 : 0);
+                }
+            }
+
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const time = Date.now() * 0.001;
+
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(time * 0.5);
+
+            for (let i = 0; i < dataArray.length; i++) {
+                const angle = (i / dataArray.length) * Math.PI * 4;
+                const intensity = dataArray[i] / 255;
+                const radius = i * 3 + intensity * 100 * sensitivity;
+                
+                const x = Math.cos(angle) * radius;
+                const y = Math.sin(angle) * radius;
+                
+                ctx.fillStyle = themes[currentTheme](intensity);
+                ctx.beginPath();
+                ctx.arc(x, y, 3 + intensity * 5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            ctx.restore();
+        }
+
+        function drawDNA() {
+            if (analyser) {
+                analyser.getByteFrequencyData(dataArray);
+            } else {
+                for (let i = 0; i < 128; i++) {
+                    dataArray[i] = Math.random() * 128 + (isPlaying ? 128 : 0);
+                }
+            }
+
+            const centerX = canvas.width / 2;
+            const time = Date.now() * 0.001;
+
+            for (let i = 0; i < dataArray.length; i++) {
+                const y = (i / dataArray.length) * canvas.height;
+                const intensity = dataArray[i] / 255;
+                const amplitude = intensity * 200 * sensitivity;
+                
+                const x1 = centerX + Math.sin(y * 0.01 + time) * amplitude;
+                const x2 = centerX - Math.sin(y * 0.01 + time) * amplitude;
+                
+                ctx.fillStyle = themes[currentTheme](intensity);
+                ctx.beginPath();
+                ctx.arc(x1, y, 5, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.beginPath();
+                ctx.arc(x2, y, 5, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Connect with line
+                ctx.strokeStyle = themes[currentTheme](intensity * 0.5);
+                ctx.globalAlpha = 0.3;
+                ctx.beginPath();
+                ctx.moveTo(x1, y);
+                ctx.lineTo(x2, y);
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        function drawKaleidoscope() {
+            if (analyser) {
+                analyser.getByteFrequencyData(dataArray);
+            } else {
+                for (let i = 0; i < 128; i++) {
+                    dataArray[i] = Math.random() * 128 + (isPlaying ? 128 : 0);
+                }
+            }
+
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const time = Date.now() * 0.001;
+            const segments = 8;
+
+            ctx.save();
+            ctx.translate(centerX, centerY);
+
+            for (let s = 0; s < segments; s++) {
+                ctx.save();
+                ctx.rotate((s / segments) * Math.PI * 2);
+                
+                for (let i = 0; i < dataArray.length / 4; i++) {
+                    const intensity = dataArray[i] / 255;
+                    const radius = i * 10 + intensity * 50 * sensitivity;
+                    const angle = time + i * 0.1;
+                    
+                    const x = Math.cos(angle) * radius;
+                    const y = Math.sin(angle) * radius;
+                    
+                    ctx.fillStyle = themes[currentTheme](intensity);
+                    ctx.globalAlpha = intensity;
+                    ctx.fillRect(x, y, 5, 5);
+                }
+                
+                ctx.restore();
+            }
+            
+            ctx.globalAlpha = 1;
+            ctx.restore();
+        }
+
+        // Main animation loop
+        function animate() {
+            animationId = requestAnimationFrame(animate);
+
+            // Fade effect
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw based on selected visualization
+            switch(currentVisualization) {
+                case 'particles':
+                    drawParticles();
+                    break;
+                case 'bars':
+                    drawBars();
+                    break;
+                case 'circular':
+                    drawCircular();
+                    break;
+                case 'spiral':
+                    drawSpiral();
+                    break;
+                case 'dna':
+                    drawDNA();
+                    break;
+                case 'kaleidoscope':
+                    drawKaleidoscope();
+                    break;
+            }
+        }
+
+        // Control event listeners
+        document.getElementById('play-pause').addEventListener('click', () => {
+            player.togglePlay();
+        });
+
+        document.getElementById('prev-track').addEventListener('click', () => {
+            player.previousTrack();
+        });
+
+        document.getElementById('next-track').addEventListener('click', () => {
+            player.nextTrack();
+        });
+
+        document.getElementById('progress-container').addEventListener('click', async (e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const percentage = x / rect.width;
+            
+            const state = await player.getCurrentState();
+            if (state) {
+                const position = state.duration * percentage;
+                player.seek(position);
+            }
+        });
+
+        document.getElementById('volume-slider').addEventListener('click', (e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const percentage = x / rect.width;
+            
+            player.setVolume(percentage);
+            document.getElementById('volume-bar').style.width = (percentage * 100) + '%';
+        });
+
+        document.getElementById('visualization-mode').addEventListener('change', (e) => {
+            currentVisualization = e.target.value;
+        });
+
+        document.getElementById('color-theme').addEventListener('change', (e) => {
+            currentTheme = e.target.value;
+        });
+
+        document.getElementById('sensitivity').addEventListener('change', (e) => {
+            sensitivity = parseFloat(e.target.value);
+        });
+
+        document.getElementById('settings-toggle').addEventListener('click', () => {
+            document.getElementById('controls').classList.toggle('hidden');
+        });
+
+        // Update progress periodically
+        setInterval(async () => {
+            if (player && isPlaying) {
+                const state = await player.getCurrentState();
+                if (state) {
+                    const progress = (state.position / state.duration) * 100;
+                    document.getElementById('progress-bar').style.width = progress + '%';
+                }
+            }
+        }, 1000);
+
+        // Initialize
+        handleCallback();
+    </script>
+</body>
+</html>
