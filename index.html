@@ -627,10 +627,14 @@
         }
 
         function drawBars() {
-            if (analyser) {
+            if (!dataArray || dataArray.length === 0) {
+                dataArray = new Uint8Array(128);
+            }
+            
+            if (analyser && source) {
                 analyser.getByteFrequencyData(dataArray);
             } else {
-                for (let i = 0; i < 128; i++) {
+                for (let i = 0; i < dataArray.length; i++) {
                     dataArray[i] = Math.random() * 128 + (isPlaying ? 128 : 0);
                 }
             }
