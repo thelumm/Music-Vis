@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Audio Music Visualizer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #000;
+            color: #fff;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        #start-screen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 40px;
+            border-radius: 20px;
+            border: 2px solid #1db954;
+            -webkit-backdrop-filter: blur(10px);
+            backdrop-filter: blur(10px);
+        }
+
+        #start-screen h1 {
+            margin-bottom: 20px;
+            font-size: 2.5em;
+            background: linear-gradient(45deg, #ff00ff, #00ffff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        button {
+            background: linear-gradient(45deg, #ff00ff, #00ffff);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 18px;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 10px;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 15px;
+            -webkit-backdrop-filter: blur(10px);
+            backdrop-filter: blur(10px);
+            display: none;
+            width: 90%;
+            max-width: 800px;
+        }
+
+        #status {
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        #audio-levels {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+        }
+
+        .level-meter {
+            text-align: center;
+        }
+
+        .level-bar {
+            width: 60px;
+            height: 150px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 30px;
+            position: relative;
+            overflow: hidden;
+            margin: 10px auto;
+        }
+
+        .level-fill {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            background: linear-gradient(to top, #ff00ff, #00ffff);
+            transition: height 0.1s;
+            border-radius: 30px;
+        }
+
+        #options {
+            display: flex;
+            gap: 15px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        select {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 8px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        select option {
+            background: #000;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        #instructions {
+            max-width: 500px;
+            margin: 20px auto;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            line-height: 1.6;
+        }
+
+        .audio-source-btn {
+            display: block;
+            width: 100%;
+            margin: 10px 0;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .audio-source-btn.screen {
+            border-color: #00ffff;
+        }
+
+        .audio-source-btn.mic {
+            border-color: #ff00ff;
+        }
+
+        .audio-source-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .recommendation {
+            font-size: 12px;
+            color: #00ff00;
+            display: block;
+            margin-top: 5px;
+        }
+
+        #toggle-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 101;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 10px 20px;
+            border-radius: 10px;
+            display: none;
+        }
+
+        #stop-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 101;
+            background: rgba(255, 0, 0, 0.5);
+            display: none;
+        }
+
+        #stop-btn:hover {
+            background: rgba(255, 0, 0, 0.7);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    
+    <div id="start-screen">
+        <h1>🎵 System Audio Visualizer</h1>
+        <p style="margin-bottom: 20px;">Choose your audio source:</p>
+        
+        <button class="audio-source-btn screen" id="screen-audio-btn">
+            🖥️ Capture System/Tab Audio
+            <span class="recommendation">✓ RECOMMENDED - Works with any audio</span>
+        </button>
+        
+        <button class="audio-source-btn mic" id="mic-audio-btn">
+            🎤 Use Microphone
+            <span class="recommendation">For external speakers/live music</span>
+        </button>
+
+        <div id="instructions">
+            <p><strong>Screen Audio:</strong> Captures any audio playing on your computer - Spotify, YouTube, games, etc.</p>
+            <p><strong>Microphone:</strong> Use if audio is playing through external speakers.</p>
+            <p style="margin-top: 10px; opacity: 0.7;">Note: You'll need to select which screen/tab to share, then audio will be captured from your entire system.</p>
+        </div>
+    </div>
+
+    <button id="toggle-controls">Toggle Controls</button>
+    <button id="stop-btn">Stop Capture</button>
+
+    <div id="controls">
+        <div id="status">
+            <div>🎵 <span id="status-text">Ready to capture audio...</span></div>
+        </div>
+
+        <div id="audio-levels">
+            <div class="level-meter">
+                <div class="level-bar">
+                    <div class="level-fill" id="bass-level"></div>
+                </div>
+                <div>Bass</div>
+            </div>
+            <div class="level-meter">
+                <div class="level-bar">
+                    <div class="level-fill" id="mid-level"></div>
+                </div>
+                <div>Mids</div>
+            </div>
+            <div class="level-meter">
+                <div class="level-bar">
+                    <div class="level-fill" id="treble-level"></div>
+                </div>
+                <div>Treble</div>
+            </div>
+        </div>
+
+        <div id="options">
+            <select id="visualization-mode" aria-label="Visualization Mode">
+                <option value="particles">Particles</option>
+                <option value="bars">Frequency Bars</option>
+                <option value="circular">Circular Wave</option>
+                <option value="spiral">Spiral</option>
+                <option value="waveform">Waveform</option>
+                <option value="spectrum">3D Spectrum</option>
+            </select>
+
+            <select id="color-theme" aria-label="Color Theme">
+                <option value="reactive">Reactive</option>
+                <option value="rainbow">Rainbow</option>
+                <option value="fire">Fire</option>
+                <option value="ocean">Ocean</option>
+                <option value="neon">Neon</option>
+                <option value="monochrome">Monochrome</option>
+            </select>
+
+            <select id="sensitivity" aria-label="Sensitivity">
+                <option value="0.5">Low</option>
+                <option value="1" selected>Normal</option>
+                <option value="2">High</option>
+                <option value="3">Ultra</option>
+            </select>
+
+            <select id="smoothing" aria-label="Smoothing">
+                <option value="0.5">Sharp</option>
+                <option value="0.8" selected>Smooth</option>
+                <option value="0.95">Very Smooth</option>
+            </select>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let audioContext;
+        let analyser;
+        let source;
+        let dataArray;
+        let bufferLength;
+        let animationId;
+        let stream;
+        
+        // Visualization settings
+        let currentVisualization = 'particles';
+        let currentTheme = 'reactive';
+        let sensitivity = 1;
+        let smoothing = 0.8;
+        
+        // Canvas setup
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Particle system
+        let particles = [];
+        const maxParticles = 150;
+        
+        // Resize canvas
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Particle class
+        class Particle {
+            constructor(x, y, intensity, frequency) {
+                this.x = x;
+                this.y = y;
+                this.size = Math.random() * 10 + intensity * 20;
+                this.speedX = (Math.random() - 0.5) * intensity * 10;
+                this.speedY = (Math.random() - 0.5) * intensity * 10;
+                this.life = 1;
+                this.decay = Math.random() * 0.01 + 0.005;
+                this.intensity = intensity;
+                this.frequency = frequency;
+                this.hue = frequency * 360;
+            }
+
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                this.life -= this.decay;
+                this.size *= 0.99;
+                this.speedY += 0.1; // Gravity effect
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = this.life;
+                ctx.fillStyle = getThemeColor(this.intensity, this.frequency);
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = ctx.fillStyle;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // Color themes
+        function getThemeColor(intensity, frequency) {
+            switch(currentTheme) {
+                case 'reactive':
+                    return `hsl(${frequency * 360}, 100%, ${30 + intensity * 40}%)`;
+                case 'rainbow':
+                    return `hsl(${(Date.now() * 0.1 + frequency * 360) % 360}, 100%, 50%)`;
+                case 'fire':
+                    return `hsl(${intensity * 60}, 100%, ${intensity * 70}%)`;
+                case 'ocean':
+                    return `hsl(${180 + frequency * 60}, 100%, ${30 + intensity * 40}%)`;
+                case 'neon':
+                    const neonColors = ['#ff00ff', '#00ffff', '#ffff00', '#ff00aa'];
+                    return neonColors[Math.floor(frequency * neonColors.length)];
+                case 'monochrome':
+                    const brightness = Math.floor(intensity * 255);
+                    return `rgb(${brightness}, ${brightness}, ${brightness})`;
+                default:
+                    return '#ffffff';
+            }
+        }
+
+        // Initialize audio context and analyser
+        async function initAudio(useScreen = true) {
+            try {
+                // Create audio context
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Get audio stream
+                if (useScreen) {
+                    // Capture screen/system audio
+                    stream = await navigator.mediaDevices.getDisplayMedia({
+                        audio: {
+                            echoCancellation: false,
+                            noiseSuppression: false,
+                            autoGainControl: false
+                        },
+                        video: true // Required for screen capture, but we'll ignore the video
+                    });
+                    
+                    // Remove video track as we only need audio
+                    const videoTrack = stream.getVideoTracks()[0];
+                    if (videoTrack) {
+                        videoTrack.stop();
+                        stream.removeTrack(videoTrack);
+                    }
+                } else {
+                    // Capture microphone
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            echoCancellation: false,
+                            noiseSuppression: false,
+                            autoGainControl: false
+                        }
+                    });
+                }
+
+                // Check if we got audio
+                const audioTracks = stream.getAudioTracks();
+                if (audioTracks.length === 0) {
+                    throw new Error('No audio track found. Make sure to share a tab/screen with "Share audio" checked.');
+                }
+
+                // Create analyser
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 2048;
+                analyser.smoothingTimeConstant = smoothing;
+                
+                // Connect audio source to analyser
+                source = audioContext.createMediaStreamSource(stream);
+                source.connect(analyser);
+                
+                // Setup data array
+                bufferLength = analyser.frequencyBinCount;
+                dataArray = new Uint8Array(bufferLength);
+                
+                // Update UI
+                document.getElementById('start-screen').style.display = 'none';
+                document.getElementById('controls').style.display = 'block';
+                document.getElementById('toggle-controls').style.display = 'block';
+                document.getElementById('stop-btn').style.display = 'block';
+                document.getElementById('status-text').textContent = useScreen ? 
+                    'Capturing system audio - Play some music!' : 
+                    'Capturing microphone input';
+                
+                // Start visualization
+                animate();
+                
+            } catch (error) {
+                console.error('Error initializing audio:', error);
+                alert('Error: ' + error.message + '\n\nMake sure to:\n1. Allow the permission request\n2. Select "Share audio" when sharing screen\n3. Pick a screen or tab (not a window)');
+            }
+        }
+
+        // Visualization functions
+        function drawParticles() {
+            analyser.getByteFrequencyData(dataArray);
+            
+            // Calculate frequency bands
+            const bass = getFrequencyRange(0, 10);
+            const mids = getFrequencyRange(10, 50);
+            const treble = getFrequencyRange(50, 100);
+            
+            // Update level meters
+            updateLevelMeters(bass, mids, treble);
+            
+            // Create particles based on audio
+            if (bass > 0.3 && particles.length < maxParticles) {
+                const intensity = bass * sensitivity;
+                for (let i = 0; i < 5; i++) {
+                    particles.push(new Particle(
+                        canvas.width / 2 + (Math.random() - 0.5) * 200,
+                        canvas.height / 2 + (Math.random() - 0.5) * 200,
+                        intensity,
+                        mids
+                    ));
+                }
+            }
+            
+            // Update and draw particles
+            particles = particles.filter(p => p.life > 0);
+            particles.forEach(p => {
+                p.update();
+                p.draw(ctx);
+            });
+        }
+
+        function drawBars() {
+            analyser.getByteFrequencyData(dataArray);
+            
+            const barWidth = canvas.width / bufferLength * 2.5;
+            let x = 0;
+            
+            for (let i = 0; i < bufferLength; i++) {
+                const barHeight = (dataArray[i] / 255) * canvas.height * 0.7 * sensitivity;
+                const frequency = i / bufferLength;
+                
+                ctx.fillStyle = getThemeColor(dataArray[i] / 255, frequency);
+                ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+                
+                // Mirror effect
+                ctx.globalAlpha = 0.3;
+                ctx.fillRect(x, canvas.height - barHeight - 10, barWidth, -barHeight * 0.3);
+                ctx.globalAlpha = 1;
+                
+                x += barWidth + 1;
+            }
+        }
+
+        function drawCircular() {
+            analyser.getByteFrequencyData(dataArray);
+            
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = Math.min(canvas.width, canvas.height) * 0.2;
+            
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            
+            for (let i = 0; i < bufferLength; i += 2) {
+                const angle = (i / bufferLength) * Math.PI * 2;
+                const intensity = dataArray[i] / 255;
+                const barHeight = intensity * 200 * sensitivity;
+                
+                ctx.save();
+                ctx.rotate(angle);
+                ctx.fillStyle = getThemeColor(intensity, i / bufferLength);
+                ctx.fillRect(radius, -2, barHeight, 4);
+                ctx.restore();
+            }
+            
+            ctx.restore();
+        }
+
+        function drawSpiral() {
+            analyser.getByteFrequencyData(dataArray);
+            
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const time = Date.now() * 0.001;
+            
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(time * 0.5);
+            
+            for (let i = 0; i < bufferLength / 4; i++) {
+                const angle = (i / bufferLength) * Math.PI * 8;
+                const intensity = dataArray[i] / 255;
+                const radius = i * 2 + intensity * 100 * sensitivity;
+                
+                const x = Math.cos(angle) * radius;
+                const y = Math.sin(angle) * radius;
+                
+                ctx.fillStyle = getThemeColor(intensity, i / bufferLength);
+                ctx.beginPath();
+                ctx.arc(x, y, 2 + intensity * 5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            ctx.restore();
+        }
+
+        function drawWaveform() {
+            analyser.getByteTimeDomainData(dataArray);
+            
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = getThemeColor(0.8, 0.5);
+            ctx.beginPath();
+            
+            const sliceWidth = canvas.width / bufferLength;
+            let x = 0;
+            
+            for (let i = 0; i < bufferLength; i++) {
+                const v = dataArray[i] / 128.0;
+                const y = v * canvas.height / 2;
+                
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+                
+                x += sliceWidth;
+            }
+            
+            ctx.lineTo(canvas.width, canvas.height / 2);
+            ctx.stroke();
+            
+            // Draw frequency bars below waveform
+            analyser.getByteFrequencyData(dataArray);
+            for (let i = 0; i < bufferLength; i += 10) {
+                const barHeight = (dataArray[i] / 255) * 100 * sensitivity;
+                ctx.fillStyle = getThemeColor(dataArray[i] / 255, i / bufferLength);
+                ctx.fillRect(i * sliceWidth * 10, canvas.height - barHeight, sliceWidth * 9, barHeight);
+            }
+        }
+
+        function drawSpectrum() {
+            analyser.getByteFrequencyData(dataArray);
+            
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            
+            // 3D effect
+            for (let depth = 5; depth > 0; depth--) {
+                ctx.globalAlpha = depth / 5;
+                
+                for (let i = 0; i < bufferLength / 2; i += 4) {
+                    const intensity = dataArray[i] / 255;
+                    const x = (i / bufferLength) * canvas.width * 2;
+                    const height = intensity * 300 * sensitivity;
+                    
+                    ctx.fillStyle = getThemeColor(intensity, i / bufferLength);
+                    ctx.fillRect(
+                        x - centerX + depth * 10, 
+                        centerY - height / 2 + depth * 5, 
+                        3, 
+                        height
+                    );
+                }
+            }
+            
+            ctx.globalAlpha = 1;
+        }
+
+        // Helper function to get frequency range average
+        function getFrequencyRange(startPercent, endPercent) {
+            const startIndex = Math.floor(bufferLength * startPercent / 100);
+            const endIndex = Math.floor(bufferLength * endPercent / 100);
+            let sum = 0;
+            
+            for (let i = startIndex; i < endIndex; i++) {
+                sum += dataArray[i];
+            }
+            
+            return (sum / (endIndex - startIndex)) / 255;
+        }
+
+        // Update level meters
+        function updateLevelMeters(bass, mids, treble) {
+            document.getElementById('bass-level').style.height = (bass * 100) + '%';
+            document.getElementById('mid-level').style.height = (mids * 100) + '%';
+            document.getElementById('treble-level').style.height = (treble * 100) + '%';
+        }
+
+        // Main animation loop
+        function animate() {
+            animationId = requestAnimationFrame(animate);
+            
+            // Fade effect
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw visualization
+            switch(currentVisualization) {
+                case 'particles':
+                    drawParticles();
+                    break;
+                case 'bars':
+                    drawBars();
+                    break;
+                case 'circular':
+                    drawCircular();
+                    break;
+                case 'spiral':
+                    drawSpiral();
+                    break;
+                case 'waveform':
+                    drawWaveform();
+                    break;
+                case 'spectrum':
+                    drawSpectrum();
+                    break;
+            }
+        }
+
+        // Stop capture
+        function stopCapture() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            if (source) {
+                source.disconnect();
+            }
+            if (audioContext) {
+                audioContext.close();
+            }
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+            
+            // Reset UI
+            document.getElementById('start-screen').style.display = 'block';
+            document.getElementById('controls').style.display = 'none';
+            document.getElementById('toggle-controls').style.display = 'none';
+            document.getElementById('stop-btn').style.display = 'none';
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles = [];
+        }
+
+        // Event listeners
+        document.getElementById('screen-audio-btn').addEventListener('click', () => {
+            initAudio(true);
+        });
+
+        document.getElementById('mic-audio-btn').addEventListener('click', () => {
+            initAudio(false);
+        });
+
+        document.getElementById('stop-btn').addEventListener('click', stopCapture);
+
+        document.getElementById('toggle-controls').addEventListener('click', () => {
+            const controls = document.getElementById('controls');
+            controls.style.display = controls.style.display === 'none' ? 'block' : 'none';
+        });
+
+        document.getElementById('visualization-mode').addEventListener('change', (e) => {
+            currentVisualization = e.target.value;
+        });
+
+        document.getElementById('color-theme').addEventListener('change', (e) => {
+            currentTheme = e.target.value;
+        });
+
+        document.getElementById('sensitivity').addEventListener('change', (e) => {
+            sensitivity = parseFloat(e.target.value);
+        });
+
+        document.getElementById('smoothing').addEventListener('change', (e) => {
+            smoothing = parseFloat(e.target.value);
+            if (analyser) {
+                analyser.smoothingTimeConstant = smoothing;
+            }
+        });
+
+        // Initial animation (decorative)
+        function idleAnimation() {
+            if (!audioContext) {
+                requestAnimationFrame(idleAnimation);
+                
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Decorative particles
+                if (Math.random() > 0.98 && particles.length < 10) {
+                    particles.push(new Particle(
+                        Math.random() * canvas.width,
+                        Math.random() * canvas.height,
+                        0.3,
+                        Math.random()
+                    ));
+                }
+                
+                particles = particles.filter(p => p.life > 0);
+                particles.forEach(p => {
+                    p.update();
+                    p.draw(ctx);
+                });
+            }
+        }
+        idleAnimation();
+    </script>
+</body>
+</html>
